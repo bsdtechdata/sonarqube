@@ -45,6 +45,9 @@ public class ProjectMeasuresQueryValidator {
       return;
     }
     List<MetricDto> dbMetrics = dbClient.metricDao().selectByKeys(dbSession, new ArrayList<>(metricKeys));
+
+    // TODO validate sort value : either a metric key, or 'name'
+
     checkMetricKeysExists(dbMetrics, metricKeys);
     checkMetricsAreEnabled(dbMetrics);
     checkMetricsAreNumerics(dbMetrics);
