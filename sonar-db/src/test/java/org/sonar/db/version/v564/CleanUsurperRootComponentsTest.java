@@ -96,6 +96,9 @@ public class CleanUsurperRootComponentsTest {
       insertRootComponent(Scopes.PROJECT, "DEV"),
       insertRootComponent(Scopes.PROJECT, "DEV_PRJ"),
     };
+    for (int i = 0; i < 250; i++) {
+      insertRootComponent(Scopes.PROJECT, Qualifiers.MODULE);
+    }
 
     underTest.execute();
 
