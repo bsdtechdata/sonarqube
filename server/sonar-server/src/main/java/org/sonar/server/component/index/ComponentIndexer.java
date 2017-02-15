@@ -40,6 +40,7 @@ import org.sonar.server.permission.index.AuthorizationScope;
 import org.sonar.server.permission.index.NeedAuthorizationIndexer;
 
 import static org.elasticsearch.index.query.QueryBuilders.boolQuery;
+import static org.elasticsearch.index.query.QueryBuilders.idsQuery;
 import static org.elasticsearch.index.query.QueryBuilders.termQuery;
 import static org.sonar.server.component.index.ComponentIndexDefinition.INDEX_COMPONENTS;
 import static org.sonar.server.component.index.ComponentIndexDefinition.TYPE_COMPONENT;
@@ -114,6 +115,13 @@ public class ComponentIndexer implements ProjectIndexer, NeedAuthorizationIndexe
       .setQuery(boolQuery()
         .filter(
           termQuery(ComponentIndexDefinition.FIELD_PROJECT_UUID, projectUuid))));
+  }
+
+  public void delete(String uuid) {
+    BulkIndexer.delete(esClient, INDEX_COMPONENTS, esClient.prepareSearch(INDEX_COMPONENTS)
+      .setQuery(boolQuery()
+        .filter(
+          idsQuery(uuid))));
   }
 
   void index(ComponentDto... docs) {

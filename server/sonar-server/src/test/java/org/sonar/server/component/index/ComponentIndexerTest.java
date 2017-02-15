@@ -143,6 +143,24 @@ public class ComponentIndexerTest {
     assertMatches("NewFile", 1);
   }
 
+  @Test
+  public void index_and_delete_one_component() {
+
+    // insert
+    ComponentDto project = dbTester.components().insertProject();
+
+    // verify insert
+    index(project);
+    assertThat(count()).isEqualTo(1);
+
+    // delete
+    createIndexer().delete(project.uuid());
+
+    // verify modification
+    index(project);
+    assertThat(count()).isEqualTo(0);
+  }
+
   private void insert(ComponentDto component) {
     dbTester.components().insertComponent(component);
   }
