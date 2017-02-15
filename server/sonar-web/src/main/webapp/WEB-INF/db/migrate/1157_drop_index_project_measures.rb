@@ -22,12 +22,9 @@
 # SonarQube 5.6.4
 # SONAR-8454
 #
-class CleanUsurperRootComponents < ActiveRecord::Migration
+class DropIndexProjectMeasures < ActiveRecord::Migration
 
   def self.up
-    add_index 'project_measures', 'project_id', :name => 'tmp_measures_project_id'
-    execute_java_migration('org.sonar.db.version.v564.FixProjectUuidOfDeveloperProjects')
-    execute_java_migration('org.sonar.db.version.v564.CleanUsurperRootComponents')
     remove_index 'project_measures', :name => 'tmp_measures_project_id'
   end
 
