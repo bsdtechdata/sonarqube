@@ -42,9 +42,9 @@ import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_BAS
 import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_BASE_COMPONENT_KEY;
 import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_FILTER;
 import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_FROM;
-import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_ID;
-import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_KEY;
-import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_NEW_KEY;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_DEPRECATED_ID;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_DEPRECATED_KEY;
+import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_DEPRECATED_NEW_KEY;
 import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_ORGANIZATION;
 import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_QUALIFIERS;
 import static org.sonarqube.ws.client.component.ComponentsWsParameters.PARAM_STRATEGY;
@@ -81,24 +81,24 @@ public class ComponentsService extends BaseService {
 
   public ShowWsResponse show(ShowWsRequest request) {
     GetRequest get = new GetRequest(path(ACTION_SHOW))
-      .setParam(PARAM_ID, request.getId())
-      .setParam(PARAM_KEY, request.getKey());
+      .setParam(PARAM_DEPRECATED_ID, request.getId())
+      .setParam(PARAM_DEPRECATED_KEY, request.getKey());
     return call(get, ShowWsResponse.parser());
   }
 
   public void updateKey(UpdateWsRequest request) {
     PostRequest post = new PostRequest(path(ACTION_UPDATE_KEY))
-      .setParam(PARAM_ID, request.getId())
-      .setParam(PARAM_KEY, request.getKey())
-      .setParam(PARAM_NEW_KEY, request.getNewKey());
+      .setParam(PARAM_DEPRECATED_ID, request.getId())
+      .setParam(PARAM_DEPRECATED_KEY, request.getKey())
+      .setParam(PARAM_DEPRECATED_NEW_KEY, request.getNewKey());
 
     call(post);
   }
 
   public BulkUpdateKeyWsResponse bulkUpdateKey(BulkUpdateWsRequest request) {
     PostRequest post = new PostRequest(path(ACTION_BULK_UPDATE_KEY))
-      .setParam(PARAM_ID, request.getId())
-      .setParam(PARAM_KEY, request.getKey())
+      .setParam(PARAM_DEPRECATED_ID, request.getId())
+      .setParam(PARAM_DEPRECATED_KEY, request.getKey())
       .setParam(PARAM_FROM, request.getFrom())
       .setParam(PARAM_TO, request.getTo());
 
