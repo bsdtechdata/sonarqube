@@ -53,6 +53,24 @@ class SelectImpl extends BaseSqlStatement<Select>implements Select {
   }
 
   @Override
+  public <T> List<T> list(RowReader<T> reader, int limit) throws SQLException {
+    ResultSet rs = pstmt.executeQuery();
+    Select.Row row = new Select.Row(rs);
+    try {
+      List<T> rows = new ArrayList<>(limit);
+      while (rs.next() && rows.size() != limit) {
+        rows.add(reader.read(row));
+      }
+      return rows;
+    } catch (Exception e) {
+      throw newExceptionWithRowDetails(row, e);
+    } finally {
+      DbUtils.closeQuietly(rs);
+      close();
+    }
+  }
+
+  @Override
   public <T> T get(Select.RowReader<T> reader) throws SQLException {
     ResultSet rs = pstmt.executeQuery();
     Select.Row row = new Select.Row(rs);

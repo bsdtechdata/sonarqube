@@ -81,13 +81,14 @@ public class CleanUsurperRootComponents extends BaseDataChange {
 
   private void cleanUsurperRootComponents(Context context) throws SQLException {
     MassUpdate massUpdate = context.prepareMassUpdate();
-    massUpdate.select(fixSqlConditions(getDb().getDialect(), "select p.id,p.uuid from projects p " +
+    String selectStatement = fixSqlConditions(getDb().getDialect(), "select p.id,p.uuid from projects p " +
       " where" +
       " p.project_uuid %s = p.uuid %s" +
       " and not (" +
       " p.scope = 'PRJ'" +
       " and p.qualifier in ('TRK', 'VW', 'DEV')" +
-      " )"));
+      " )");
+    massUpdate.select(selectStatement, MassUpdate.SqlConsumer.identity(), row -> new Component(row.getLong(1), row.getString(2)));
     massUpdate.update("delete from duplications_index where snapshot_id in (select id from snapshots where project_id=?)");
     massUpdate.update("delete from project_measures where project_id=?");
     massUpdate.update("delete from ce_activity where component_uuid=?");
@@ -103,8 +104,8 @@ public class CleanUsurperRootComponents extends BaseDataChange {
     massUpdate.update("delete from projects where uuid=?");
     massUpdate.rowPluralName("usurper root components");
     massUpdate.execute((row, update, updateIndex) -> {
-      long componentId = row.getLong(1);
-      String componentUuid = row.getString(2);
+      long componentId = row.id;
+      String componentUuid = row.uuid;
       switch (updateIndex) {
         case 0:
         case 1:
@@ -136,7 +137,17 @@ public class CleanUsurperRootComponents extends BaseDataChange {
         default:
           throw new IllegalArgumentException("Unsupported update index " + updateIndex);
       }
-    });
+    }, Component.class);
+  }
+
+  private static final class Component {
+    private final long id;
+    private final String uuid;
+
+    public Component(long id, String uuid) {
+      this.id = id;
+      this.uuid = uuid;
+    }
   }
 
   private static void cleanSnapshotWithIncorrectRoot(Context context) throws SQLException {

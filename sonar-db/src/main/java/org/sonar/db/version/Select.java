@@ -160,6 +160,8 @@ public interface Select extends SqlStatement<Select> {
 
   <T> List<T> list(RowReader<T> reader) throws SQLException;
 
+  <T> List<T> list(RowReader<T> reader, int limit) throws SQLException;
+
   @CheckForNull
   <T> T get(RowReader<T> reader) throws SQLException;
 

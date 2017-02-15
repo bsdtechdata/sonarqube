@@ -86,6 +86,17 @@ public class MassUpdate {
     boolean handle(Select.Row row, SqlStatement update, int updateIndex) throws SQLException;
   }
 
+  @FunctionalInterface
+  public interface RowMultiHandler<T> {
+    /**
+     * Convert some column values of a given row.
+     *
+     * @param updateIndex 0-based
+     * @return true if the row must be updated, else false. If false, then the update parameter must not be touched.
+     */
+    boolean handle(T row, SqlStatement update, int updateIndex) throws SQLException;
+  }
+
   private final Database db;
   private final Connection readConnection;
   private final Connection writeConnection;
@@ -93,6 +104,9 @@ public class MassUpdate {
   private final ProgressLogger progress = ProgressLogger.create(getClass(), counter);
 
   private Select select;
+  private String selectStatement;
+  private SqlConsumer<Select> prepareSelect;
+  private Select.RowReader<?> selectRowReader;
   private List<String> updateStatements = new ArrayList<>(1);
 
   MassUpdate(Database db, Connection readConnection, Connection writeConnection) {
@@ -104,6 +118,12 @@ public class MassUpdate {
   public SqlStatement select(String sql) throws SQLException {
     this.select = SelectImpl.create(db, readConnection, sql);
     return this.select;
+  }
+
+  public <T> void select(String sql, SqlConsumer<Select> prepareSelect, Select.RowReader<T> rowReader) throws SQLException {
+    this.selectStatement = sql;
+    this.prepareSelect = prepareSelect;
+    this.selectRowReader = rowReader;
   }
 
   public MassUpdate update(String sql) throws SQLException {
@@ -141,7 +161,8 @@ public class MassUpdate {
   }
 
   public void execute(MultiHandler handler) throws SQLException {
-    checkState(select != null && !updateStatements.isEmpty(), "SELECT or UPDATE(s) requests are not defined");
+    checkState(select != null && selectStatement == null && prepareSelect == null && selectRowReader == null
+        && !updateStatements.isEmpty(), "SELECT or UPDATE(s) requests are not defined");
 
     progress.start();
     try {
@@ -154,6 +175,34 @@ public class MassUpdate {
     } finally {
       progress.stop();
     }
+  }
+
+  public <T> void execute(RowMultiHandler<T> handler, Class<T> clazz) throws SQLException {
+    checkState(select == null && selectStatement != null && prepareSelect != null && selectRowReader != null
+        && !updateStatements.isEmpty(), "SELECT or UPDATE(s) requests are not defined");
+
+    progress.start();
+    try {
+      List<?> rows;
+      while ( !(rows= readRows(BatchSession.MAX_BATCH_SIZE)).isEmpty()) {
+        try (RowMultiHandlerRowHandler<T> h = new RowMultiHandlerRowHandler<>(handler)) {
+          for (Object row : rows) {
+            h.handle(clazz.cast(row));
+          }
+        }
+      }
+
+      // log the total number of processed rows
+      progress.log();
+    } finally {
+      progress.stop();
+    }
+  }
+
+  private List<?> readRows(int i) throws SQLException {
+    Select select = SelectImpl.create(db, readConnection, selectStatement);
+    prepareSelect.accept(select);
+    return select.list(this.selectRowReader, i);
   }
 
   private static class ConcurrentPreparedStatementLoggingConnection implements Connection {
@@ -834,6 +883,53 @@ public class MassUpdate {
     }
   }
 
+
+  private class RowMultiHandlerRowHandler<T> implements AutoCloseable {
+    private final Multimap<String, SqlStatementBufferingProxy> proxiesPerUpdateStatement = ArrayListMultimap.create();
+    private final RowMultiHandler<T> handler;
+    private int rowCount = 0;
+
+    private RowMultiHandlerRowHandler(RowMultiHandler<T> handler) {
+      this.handler = handler;
+    }
+
+    public void handle(T row) throws SQLException {
+      if (rowCount == BatchSession.MAX_BATCH_SIZE) {
+        executeStatements();
+      }
+      int statementIndex = 0;
+      for (String updateStatement : updateStatements) {
+        SqlStatementBufferingProxy buffer = new SqlStatementBufferingProxy();
+        if (handler.handle(row, buffer, statementIndex)) {
+          proxiesPerUpdateStatement.put(updateStatement, buffer);
+        }
+        statementIndex++;
+      }
+      rowCount++;
+    }
+
+    @Override
+    public void close() throws SQLException {
+      if (rowCount > 0) {
+        executeStatements();
+      }
+    }
+
+    private void executeStatements() throws SQLException {
+      for (String updateStatement : updateStatements) {
+        UpsertImpl update = UpsertImpl.create(writeConnection, updateStatement);
+        for (SqlStatementBufferingProxy bufferingProxy : proxiesPerUpdateStatement.get(updateStatement)) {
+          bufferingProxy.accept(update);
+          update.addBatch();
+        }
+        closeUpsertImpl(update);
+      }
+
+      counter.addAndGet(rowCount);
+      rowCount = 0;
+    }
+  }
+
   private class MultiHandlerRowHandler implements Select.RowHandler, AutoCloseable {
     private final Multimap<String, SqlStatementBufferingProxy> proxiesPerUpdateStatement = ArrayListMultimap.create();
     private final MultiHandler handler;
@@ -882,8 +978,12 @@ public class MassUpdate {
   }
 
   @FunctionalInterface
-  private interface SqlConsumer<T> {
+  public interface SqlConsumer<T> {
     void accept(T t) throws SQLException;
+
+    static <T> SqlConsumer<T> identity() {
+      return t -> {};
+    }
   }
 
   private static final class SqlStatementBufferingProxy implements SqlStatement<SqlStatementBufferingProxy>, SqlConsumer<SqlStatement> {
